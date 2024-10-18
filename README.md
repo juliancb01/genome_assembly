@@ -1,5 +1,5 @@
 # Genome_Assembly
-This repository is for my Masters project (2024-June 2025), related to aim 1 of 3: genome assembl.
+This repository is for my Masters project (2024-June 2025), related to aim 1 of 3: genome assembly.
 
 Any scripts related to DNA data, assembly &amp; analysis of related outputs. Details of files contained in each folder are described below
 
