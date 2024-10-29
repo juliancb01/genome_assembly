@@ -1,3 +1,0 @@
-ITS2 = conserved sequence used for barcoding in Symbiodiniaceae
-Since suspect microalgal contamination in WT, ran BLAST against contigs in each HIFI only assembly with every known Symbiodiniaceae ITS2 sequence as the query. 
-The rmd file has the analysis of these BLAST results, mapping the best alignments (by length i.e., alignment starts within 10bp of the beginning and ends within 10bp of the end so the match extends for most of the ITS2 sequence: other matches discarded as unlikely matches - expect low e-values as the sequences are very similar: many matches if just filtering by e-value < 1e-5)

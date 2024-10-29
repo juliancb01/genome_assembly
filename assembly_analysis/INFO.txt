@@ -1,0 +1,10 @@
+Typical genome assessment = QUAST & BUSCO
+QUAST = --reference flag for comparison against Cladocopium proliferum reference
+    thus gives another measure of ~completeness (on top of BUSCO)
+BUSCO = comparison against Alveolate database - the 'closest' taxonomic group
+    to Symbiodiniaceae available to download (superphylum/major-order level)
+
+Other: coverage analysis rmd file = plots for coverage & length of contigs 
+    ^useful to identify outliers (really short contigs with high coverage?)
+    & assess general 'spread' of coverage across contigs (e.g., how much coverage
+    do the longest contigs have?)
