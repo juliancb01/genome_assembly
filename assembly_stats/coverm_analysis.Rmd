@@ -1,8 +1,10 @@
 ---
-title: "SS1_coverage"
+title: "coverage_analysis_SS1example"
 output: html_document
 date: "2024-10-17"
 ---
+
+Functions required to create combined dataset (coverage + length information across read types) and create databases for different jobs (main one used here is opt = 'long' as require long format database for scatterplots)
 ```{r}
 combine <- function(file_types, coverm_files, length_file){
   lens <- read.table(length_file, header=FALSE)
@@ -54,30 +56,33 @@ alt_db <- function(db, opt){
 }
 ```
 
+Function for scatterplot generation (two different plotting options - may require editing of axes depending on dataset)
 ```{r}
-xlen_ycov <- function(db_long, title, subtitle, div = 1000, w=TRUE){
+xlen_ycov <- function(db, db_long, title, subtitle, div = 1000, w=TRUE){
   #if div = 1000 (default), get lengths of contigs in kbs
   #if w=TRUE (default), will wrap by read type. If not, will just give total
-  ONT_MEAN <- mean(coverdb$ONT)
-  ONT_MEDIAN <- median(coverdb$ONT)
+
+  #calculating statistics to be printed/used in plots
+  ONT_MEAN <- mean(db$ONT)
+  ONT_MEDIAN <- median(db$ONT)
   ONT_TEXT <- paste0("Mean(median): ", round(ONT_MEAN, digits=2),
                      ' (', round(ONT_MEDIAN, digits=2), ')')
-  HIFI_MEAN <- mean(coverdb$HIFI)
-  HIFI_MEDIAN <- median(coverdb$HIFI)
+  HIFI_MEAN <- mean(db$HIFI)
+  HIFI_MEDIAN <- median(db$HIFI)
   HIFI_TEXT <- paste0("Mean(median): ", round(HIFI_MEAN, digits=2),
                       ' (', round(HIFI_MEDIAN, digits=2), ')')
-  SR_MEAN <- mean(coverdb$SR)
-  SR_MEDIAN <- median(coverdb$SR)
+  SR_MEAN <- mean(db$SR)
+  SR_MEDIAN <- median(db$SR)
   SR_TEXT <- paste0("Mean(median): ", round(SR_MEAN, digits=2),
                     ' (', round(SR_MEDIAN, digits=2), ')')
-  VAL_MEAN <- mean(coverdb$total)
-  VAL_MEDIAN <- median(coverdb$total)
+  VAL_MEAN <- mean(db$total)
+  VAL_MEDIAN <- median(db$total)
   VAL_TEXT <- paste0("Mean(median): ", round(VAL_MEAN, digits=2),
                      ' (', round(VAL_MEDIAN, digits=2), ')')
   
   dat_text <- data.frame(label = c(ONT_TEXT, HIFI_TEXT, SR_TEXT, VAL_TEXT),
                          read_type = c("ONT","HIFI", "SR", "total"))
-  m <- max(coverdb_long$length)/1000
+  m <- max(coverdb_long$length)/div
   
   if (w==TRUE){
     p <- ggplot(db_long, aes(x=length/div, y=mean_coverage, colour=read_type)) +
@@ -155,131 +160,22 @@ length_file = "SS1_p1filt_SRpol_lengths_fixed.tsv"
 SS1p1_coverdb <- combine(file_types, coverm_files, length_file)
 SS1p1_coverdb_long <- alt_db(coverdb, opt="long")
 
-
 ```
 
 ```{r}
 t="SS1, purge=0: contig length by coverage plot"
-SS1p0_g <- xlen_ycov(SS1p0_coverdb_long, title=t, subtitle="Divided by read type", w=TRUE)
-SS1p0_gtot <- xlen_ycov(SS1p0_coverdb_long, title=t, subtitle="Combined (total) coverage", w=FALSE)
+SS1p0_g <- xlen_ycov(SS1p0_coverdb, SS1p0_coverdb_long, title=t, subtitle="Divided by read type", w=TRUE)
+SS1p0_gtot <- xlen_ycov(SS1p0_coverdb, SS1p0_coverdb_long, title=t, subtitle="Combined (total) coverage", w=FALSE)
 SS1p0_g
 SS1p0_gtot
 ```
 
 ```{r}
 t="SS1, purge=1: contig length by coverage plot"
-SS1p1_g <- xlen_ycov(SS1p1_coverdb_long, 
-                     title=t, 
-                     subtitle="Divided by read type", w=TRUE)
-SS1p1_gtot <- xlen_ycov(SS1p1_coverdb_long, 
-                        title=t, 
-                        subtitle="Combined (total) coverage", w=FALSE)
+SS1p1_g <- xlen_ycov(SS1p1_coverdb, SS1p1_coverdb_long, title=t, subtitle="Divided by read type", w=TRUE)
+SS1p1_gtot <- xlen_ycov(SS1p1_coverdb, SS1p1_coverdb_long, title=t, subtitle="Combined (total) coverage", w=FALSE)
 SS1p1_g
 SS1p1_gtot
 ```
 
 
-
-#p1filt coverage
-
-```{r warning=FALSE}
-library(forcats)
-library(viridis)
-directory = "~/Desktop/quick/cover_data/"
-setwd(directory)
-
-assembler="Hifiasm" 
-file_types = c("HIFI","ONT", "SR")
-coverm_files = c("SS1_p1filt_SRpol_HIFIcoverm.txt", 
-                 "SS1_p1filt_SRpol_ONTcoverm.txt",
-                 "SS1_p1filt_SRpol_SRcoverm.txt")
-length_file = "SS1_p1filt_SRpol_lengths_fixed.tsv"
-
-source("~/Desktop/quick/coverage_analysis.R")
-coverdb1 <- combine(file_types, coverm_files, length_file)
-coverdb1_long <- alt_db(coverdb1, opt="long")
-#coverdb1_bar <- alt_db(coverdb, opt="bar")
-#coverdb1_box <- alt_db(coverdb, opt="box")
-```
-
-
-```{r}
-ONT_MEAN <- mean(coverdb1$ONT)
-ONT_MEDIAN <- median(coverdb1$ONT)
-ONT_TEXT <- paste0("Mean(median): ", round(ONT_MEAN, digits=2),
-                   ' (', round(ONT_MEDIAN, digits=2), ')')
-
-HIFI_MEAN <- mean(coverdb1$HIFI)
-HIFI_MEDIAN <- median(coverdb1$HIFI)
-HIFI_TEXT <- paste0("Mean(median): ", round(HIFI_MEAN, digits=2),
-                    ' (', round(HIFI_MEDIAN, digits=2), ')')
-
-SR_MEAN <- mean(coverdb1$SR)
-SR_MEDIAN <- median(coverdb1$SR)
-SR_TEXT <- paste0("Mean(median): ", round(SR_MEAN, digits=2),
-                  ' (', round(SR_MEDIAN, digits=2), ')')
-
-VAL_MEAN <- mean(coverdb1$total)
-VAL_MEDIAN <- median(coverdb1$total)
-VAL_TEXT <- paste0("Mean(median): ", round(VAL_MEAN, digits=2),
-                   ' (', round(VAL_MEDIAN, digits=2), ')')
-
-dat_text1 <- data.frame(label = c(ONT_TEXT, HIFI_TEXT, SR_TEXT, VAL_TEXT),
-                       read_type = c("ONT","HIFI","SR","total"))
-
-m <- max(coverdb1_long$length)/1000
-
-```
-
-```{r, fig.width=8, fig.height=5}
-#length in kb now
-ggplot(coverdb1_long, aes(x=length/1000, y=mean_coverage, colour=read_type)) +
-  geom_point(alpha=0.7) +
-  scale_colour_manual(values=c("#F6A600", "#7286A0", "#8DB600", "#CC4E5C")) +
-  geom_hline(yintercept=30, linetype="dashed", colour="#2F4F4F") +
-  scale_x_continuous(trans = scales::pseudo_log_trans(sigma = 4),
-                     breaks=c(0, 10, 25, 50, 250, 100, 500, 
-                              1000,2500, 5000, 10000),
-                     minor_breaks = NULL) +
-  geom_text(size=3.5, colour = "black", data = dat_text1, 
-            mapping = aes(x = -Inf, y = -Inf, label = label),
-            hjust = -1, vjust = -15.5) +
-  scale_y_continuous(trans = scales::pseudo_log_trans(sigma = 0.7),
-                     breaks = c(0, 5, 10, 30, 100, 1000), 
-                     minor_breaks = NULL) +
-  labs(title="SS1+p1filt+SRpol: Contig length and coverage plot",
-       subtitle = "Values by read type (ONT, HIFI, SR and combined)") +
-  xlab("Contig length (Kbp)")+
-  ylab("Mean coverage")+
-  theme(legend.position="none")+
-  facet_wrap(~read_type)
-```
-
-```{r}
-nex <- coverdb1_long[coverdb1_long$read_type=='total',]
-
-ggplot(nex, aes(x=length/1000, y=mean_coverage)) +
-  geom_point(alpha=0.9, colour ="#8C9A7C") +
-  #scale_colour_manual(values=c("#F6A600", "#8DB600")) +
-  geom_hline(yintercept=30, linetype="dashed", colour="#EB4C42") +
-  geom_hline(yintercept=VAL_MEAN, 
-             linetype="dashed", colour="#90323D") +
-  annotate(geom="text", y=VAL_MEAN+60, x=1750, colour="#90323D",size=3.7,
-           label=paste0("Mean coverage: ", round(VAL_MEAN, digits=2))) +
-  geom_hline(yintercept=VAL_MEDIAN, 
-             linetype="dashed", colour="#355e3b") +
-  annotate(geom="text", y=VAL_MEDIAN+30, x=1750, colour="#355e3b",size=3.7,
-           label=paste0("Median coverage: ", round(VAL_MEDIAN, digits=2))) +
-  scale_x_continuous(trans = scales::pseudo_log_trans(sigma = 0.2),
-                     breaks=c(0, 10, 25, 50, 250, 100, 500, 
-                              1000, 2500,5000,7500),
-                     minor_breaks = NULL) +
-  scale_y_continuous(trans = scales::pseudo_log_trans(sigma = 4),
-                     breaks = c(0, 5, 10, 20, 30, 50, 100, 200, 
-                                500, 1000, 2000), 
-                     minor_breaks = NULL) +
-  labs(title="Contig length and total coverage (combined ONT, HIFI & SR)",
-       subtitle = "For SS9 Hifiasm (p0filt) assembly, cleaned with FCS & polished with short-reads") +
-  xlab("Length (kb, log-scale)") + 
-  ylab("Mean Coverage (log-scale)")
-```
