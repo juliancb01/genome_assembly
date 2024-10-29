@@ -130,15 +130,10 @@ xlen_ycov <- function(db, db_long, title, subtitle, div = 1000, w=TRUE){
 
 
 ```{r warning=FALSE}
-library(forcats)
-library(viridis)
 library(ggplot2)
-library(reshape)
 library(readr)
 library(dplyr)
-library(scatterpie)
 library(tidyr)
-library(psych) 
 
 directory = "~/Desktop/quick/cover_data/"
 setwd(directory)
