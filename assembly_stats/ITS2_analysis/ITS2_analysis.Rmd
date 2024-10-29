@@ -1,0 +1,215 @@
+---
+title: "ITS2_analysis"
+output: html_document
+date: "2024-08-14"
+---
+
+NOTE:
+- pre-filtered ITS2 alignment matches with: "awk ' $11<=1E-20 {print} ' $dir/ITS2_flye.txt"
+^^just to make files smaller & more 'manageable' within R (massive files = overload compute)
+
+Data preparation functions + setup required
+```{r}
+library(RFLPtools)
+library(stringr)
+library(ggplot2)
+library(tidyverse)
+library(scales)
+library(seqinr)
+library(labelled)
+library(ggpubr)
+library(cowplot)
+
+colours <- c("#8DB600","#DCD300","#95B8E3","#E25822","#E68FAC","#F6A600","#90323D","#7286A0","#BC8034","#8BCA84","#488A99","#B2560D", "#6B8173","#78679A","#ecd9bc","#feadb9","#8c9a7c","#b29882","#355e3b","#bc85a3","#9799ba","#4a7ba6","#daa520","#9f8170","#eb4c42","#bdb76b","#663854","#2f4f4f","#cc4e5c","#96c8a2","#e5aa70")
+
+setwd("~/Desktop/p/Results/ASSEMBLYQC/ITS2")
+seqs <- read.fasta(file="ITS2_seqs.fasta", seqtype="DNA", forceDNAtolower = FALSE,
+                   as.string=TRUE, set.attributes = FALSE, strip.desc=TRUE)
+
+#all the different possible genera names (indicated by first letter)
+comb_lab <- c("A"=expression(italic("Symbiodinium")~"sp."),
+              "B"=expression(italic("Breviolum")~"sp."),
+              "C"=expression(italic("Cladocopium")~"sp."),
+              "D"=expression(italic("Durusdinium")~"sp."),
+              "E"=expression(italic("Effrenium")~"sp."),
+              "F"=expression(italic("Fugacium")~"sp."),
+              "G"=expression(italic("Gerakladium")~"sp."),
+              "H"=expression(italic("Halluxium")~"sp."), 
+              "I"=expression(italic("Symbiodinium")~"(Clade I) sp."), 
+              "J"=expression(italic("Symbiodinium")~"(Clade J) sp."), 
+              "A1"=expression(italic("S. microadriaticum")), 
+              "C1"=expression(italic("C. goreaui")), 
+              "D1"=expression(italic("D. trenchii")), 
+              "E1"=expression(italic("E. voratum")), 
+              "F1"=expression(italic("F. kawagutii")))
+
+#command for making database + relevant columns & reduction in size
+#wont take up massive memory with intermediary databases
+add_colms <- function(db, a){
+  db <- db %>%
+    group_by(query.id) %>%
+    mutate(gen = substr(query.id,1,1),
+           query_length = nchar(seqs[query.id][1]),
+           length_diff = query_length-alignment.length,
+           assemb = a,
+           spec = case_when(
+             grepl("(A1)$", query.id) ~ "A1",
+             grepl("(C1)$", query.id) ~ "C1",
+             grepl("(D1a|D1|D2|D3|D4)$", query.id) ~ "D1",
+             grepl("(E1)$", query.id) ~ "E1",
+             grepl("(F3.6|Fr5)$", query.id) ~ "F1",
+             .default = gen
+           )) %>%
+    filter(q.start<=10 & query_length-q.end<=10) %>%
+    subset(select = c(subject.id, spec, gen, assemb, evalue, length_diff))
+
+  return(db)
+}
+
+#actually reading in files given to function --> combined database
+gendb <- function(files, files_types){
+  for (i in 1:length(files)){
+    if (i == 1){
+      findb = add_colms(read.blast(files[i]), a=paste0(file_types[i]))
+    } else {
+      mid_db = add_colms(read.blast(files[i]), a=paste0(file_types[i]))
+      findb <- rbind(mid_db, findb)
+    }
+  }
+  return(findb)
+}
+```
+
+Plotting & table generation functions
+```{r}
+tot_plot <- function(db, title){
+  p <- ggplot(db, aes(x=length_diff, y=-log10(evalue), color=spec)) +
+    geom_point(size=1, alpha=0.6) +
+    scale_colour_manual(values=colours, labels=comb_lab) +
+    geom_vline(xintercept=0, linetype="dashed", color = "#90323D") +
+    labs(title=title) +
+    xlab("Difference in length of the alignment and ITS2 sequence") +
+    ylab("Alignment e-value (-log10 scale)") +
+    guides(color = guide_legend(title="ITS2 group",
+                                override.aes=list(size=2, alpha=1))) +
+    theme(legend.position="bottom", plot.title=element_text(face="bold")) +
+    facet_grid(~assemb)
+  return(p)
+}
+
+#give statistics on alignments by TAXA
+taxa_table <- function(db){
+  db <- db %>% 
+    group_by(assembly=assemb, taxa=spec) %>%
+    summarize(count=n(),
+              mean_evalue=mean(evalue),
+              mean_length_diff=round(abs(mean(length_diff)), digits=1)) %>%
+  mutate(proportion=round(count/sum(count), digits=4))
+  return(db)
+}
+
+#give statistics on alignments by CONTIG (how many are just mapping to the same few contigs?)
+contig_table <- function(db){
+  db <- db %>% 
+    group_by(subject.id, gen, assemb) %>%
+    summarize(count=n(),
+              mean_evalue=mean(evalue), 
+              mean_length_diff=round(mean(length_diff), digits=1)) 
+  return(db)
+}
+
+#both table functions will be fed directly into write.csv so can be exported
+```
+
+Code block to create all databases for each strains
+```{r, warning=FALSE}
+setwd("~/Desktop/p/Results/ASSEMBLYQC/ITS2/FILES/")
+file_types = c("metaMDBG","flye","hicanu")
+
+SS1_files = c("ITS2_SS1_meta.txt","ITS2_SS1_flye.txt","ITS2_SS1_hicanu.txt")
+SS1_db <- gendb(files, file_types)
+
+SS3_files = c("ITS2_SS3_meta.txt","ITS2_SS3_flye.txt","ITS2_SS3_hicanu.txt")
+SS3_db <- gendb(SS3_files, file_types)
+
+SS5_files = c("ITS2_SS5_meta.txt","ITS2_SS5_flye.txt","ITS2_SS5_hicanu.txt")
+SS5_db <- gendb(SS5_files, file_types)
+
+SS7_files = c("ITS2_SS7_meta.txt","ITS2_SS7_flye.txt","ITS2_SS7_hicanu.txt")
+SS7_db <- gendb(SS7_files, file_types)
+
+SS8_files = c("ITS2_SS8_meta.txt","ITS2_SS8_flye.txt","ITS2_SS8_hicanu.txt")
+SS8_db <- gendb(SS8_files, file_types)
+
+SS9_files = c("ITS2_SS9_meta.txt","ITS2_SS9_flye.txt","ITS2_SS9_hicanu.txt")
+SS9_db <- gendb(SS9_files, file_types)
+
+WT_files = c("ITS2_WT_meta.txt","ITS2_WT_flye.txt","ITS2_WT_hicanu.txt")
+WT_db <- gendb(WT_files, file_types)
+```
+
+Now in order, generating plots + saving summary tables as csvs
+```{r}
+tot_plot(SS1_db, "Strain SS1: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(SS1_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS1_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(SS1_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS1_contigtab.csv", row.names = FALSE)
+```
+
+```{r}
+tot_plot(SS3_db, "Strain SS3: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(SS3_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS3_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(SS3_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS3_contigtab.csv", row.names = FALSE)
+```
+
+```{r}
+tot_plot(SS5_db, "Strain SS5: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(SS5_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS5_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(SS5_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS5_contigtab.csv", row.names = FALSE)
+```
+
+```{r}
+tot_plot(SS7_db, "Strain SS7: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(SS7_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS7_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(SS7_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS7_contigtab.csv", row.names = FALSE)
+```
+
+```{r}
+tot_plot(SS8_db, "Strain SS8: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(SS8_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS8_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(SS8_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS8_contigtab.csv", row.names = FALSE)
+```
+
+```{r}
+tot_plot(SS9_db, "Strain SS9: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(SS9_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS9_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(SS9_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/SS9_contigtab.csv", row.names = FALSE)
+```
+
+```{r}
+tot_plot(WT_db, "Strain WT: Best ITS2 sequence alignments, HIFI-only assemblies")
+
+write.csv(taxa_table(WT_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/WT_taxatab.csv", row.names = FALSE)
+write.csv(contig_table(WT_db), 
+          "~/Desktop/p/Results/ASSEMBLYQC/ITS2/CSVs/WT_contigtab.csv", row.names = FALSE)
+```
+
+
